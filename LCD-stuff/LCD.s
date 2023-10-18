@@ -78,7 +78,186 @@ E= %00000010
   STA PORTB
   EOR #E         ; pull E bit low
   STA PORTB
+
+  LDA #%01100000 ; write e
   
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%01010000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01100000 ; write l
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%11000000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01100000 ; write l
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%11000000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01100000 ; write o
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%11110000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%00100000 ; write blank
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%00000000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01110000 ; write w
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%01110000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01100000 ; write o
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%11110000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01110000 ; write r
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%00100000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01100000 ; write l
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%11000000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
+  
+  LDA #%01100000 ; write d
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB
+  
+  LDA #%01000000 
+  
+  ORA #RS
+  STA PORTB      ; write cycle
+  ORA #E         ; pull E bit high
+  STA PORTB
+  EOR #E         ; pull E bit low
+  STA PORTB  
 loop:
   JMP loop
 
