@@ -1,3 +1,6 @@
+UPPERMASK=$F0
+LOWERMASK=$0F
+
 PORTB=$6000
 DDRB=$6002
 ; first 4 bits represent data
@@ -33,37 +36,32 @@ reset:
   LDA #%00010000
   JSR lcd_instruction
   
-  LDA #%01010000 ; write S
+  LDX #0
+print:
+  LDA message,x
+  BEQ loop
   JSR print_char
-  LDA #%00110000
-  JSR print_char
-  
-  LDA #%01100000 ; write a
-  JSR print_char
-  LDA #%00010000
-  JSR print_char
-  
-  LDA #%01100000 ; write h
-  JSR print_char
-  LDA #%10000000
-  JSR print_char
-  
-  LDA #%01100000 ; write i
-  JSR print_char
-  LDA #%10010000
-  JSR print_char
-  
-  LDA #%01100000 ; write l
-  JSR print_char
-  LDA #%11000000
-  JSR print_char
+  INX
+  JMP print
   
 loop:
   JMP loop
   
-  
+message: .asciiz "Sahil is cool"
 print_char:
+  PHA
+  AND #UPPERMASK
   ORA #RS
+  JSR lcd_instruction
+  PLA
+  ROL
+  ROL
+  ROL
+  ROL
+  AND #UPPERMASK
+  ORA #RS
+  JSR lcd_instruction
+  RTS
 lcd_instruction:
   STA PORTB      ; instruction cycle
   ORA #E         ; pull E bit high
