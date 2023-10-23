@@ -38,7 +38,7 @@ reset:
   
   LDX #0
 print:
-  LDA message,x
+  LDA message,x   ; use x as index to continually print out chars in "message"
   BEQ loop
   JSR print_char
   INX
@@ -47,13 +47,13 @@ print:
 loop:
   JMP loop
   
-message: .asciiz "Sahil is cool"
+message: .asciiz "Sahil is cool" ; creates a null-terminated string in memory
 print_char:
-  PHA
-  AND #UPPERMASK
+  PHA                  ; push a onto stack to preserve the char
+  AND #UPPERMASK       ; manipulate it for the high nibble
   ORA #RS
   JSR lcd_instruction
-  PLA
+  PLA                  ; pull a back to use the lower nibble
   ROL
   ROL
   ROL
