@@ -1,18 +1,18 @@
 UPPERMASK=$F0
 LOWERMASK=$0F
 
-PORTB=$6000
-DDRB=$6002
+PORTA=$6001
+DDRA=$6003
 ; first 4 bits represent data
-RS=%00001000
+RS=%00000010
 RW=%00000100
-E= %00000010
+E= %00001000
 
   .org $8000
 
 reset:  
   LDA #%11111111 ; set all pins on port B to output
-  STA DDRB
+  STA DDRA
   
   LDA #%00100000 ; set 4 bit mode
   JSR lcd_instruction
@@ -60,12 +60,12 @@ print_char:
   ROL
   AND #UPPERMASK
   ORA #RS
-  JSR lcd_instruction
-  RTS
+  ; JSR lcd_instruction
+  ; RTS
 lcd_instruction:
-  STA PORTB      ; instruction cycle
+  STA PORTA      ; instruction cycle
   ORA #E         ; pull E bit high
-  STA PORTB
+  STA PORTA
   EOR #E         ; pull E bit low
-  STA PORTB
+  STA PORTA
   RTS
