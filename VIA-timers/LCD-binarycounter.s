@@ -11,19 +11,40 @@ DDRC=$5003
 DDRB=$6002
 DDRA=$6003
 
+VIA_ACR=$500B ; VIA 2 assumed
+VIA_T1CL=$5004
+VIA_T1CH=$5005
+VIA_IER=$500E
+
 ; first 4 bits represent data, MSB to LSB
 RS=%00000010
 RW=%00000100
 E= %00001000
 
-BYTE=$0000 ; one byte value
+BYTE=$00 ; one byte value
 BYTE_DISPLAY=$0200 ; up to 34 bytes, one extra byte to account for line break with $0D on a 16x2 display and one for termination
 BYTE_DISPLAY_CURSOR=$0222 ; one byte value that points cursor at a position in byte_display
+
+ticks=$01
+toggle_time=$05
 
   .org $8000
   JMP reset
 irq:
-reset:  
+  BIT VIA_T1CL
+  INC ticks
+  BNE end_irq
+  INC ticks + 1
+  BNE end_irq
+  INC ticks + 2
+  BNE end_irq
+  INC ticks + 3
+end_irq:
+  RTI
+reset:
+  STZ toggle_time
+  JSR init_timer
+
   LDA #%11111111 ; set all pins on port A to output
   STA DDRC
   
@@ -43,8 +64,7 @@ reset:
   LDA #%00000110 ; entry mode set
   JSR lcd_instruction
 
-  LDA #234 ; $ea ; %11101010
-  STA BYTE
+  STZ BYTE
   STZ BYTE_DISPLAY_CURSOR
   BRA binary_to_display
   
@@ -62,8 +82,25 @@ print:
   JSR print_char
   INX
   BRA print
+carriage_return:
+  LDA #%10101000 ; load $40 into DDRAM to push cursor down
+  JSR lcd_instruction
+  INX
+  BRA print
 
 loop:
+  SEC
+  LDA ticks
+  SBC toggle_time
+  CMP #50 ; have 500 ms elapsed?
+  BCC loop
+
+  INC BYTE
+  STZ BYTE_DISPLAY_CURSOR
+  LDA ticks
+  STA toggle_time
+  BRA binary_to_display
+
   JMP loop
   
 ; message: 
@@ -85,7 +122,7 @@ btd_loop:
   ROR
   INX
   ; STX BYTE_DISPLAY_CURSOR
-  STZ BYTE_DISPLAY,x
+  ; STZ BYTE_DISPLAY,x
   BRA btd_loop
 return_1:
   PHA
@@ -94,7 +131,7 @@ return_1:
   PLA
   INX
   ; STX BYTE_DISPLAY_CURSOR
-  STZ BYTE_DISPLAY,x
+  ; STZ BYTE_DISPLAY,x
   ROR
   BRA btd_loop
 
@@ -125,14 +162,27 @@ binary_to_hex_to_display:
   INX
   STZ BYTE_DISPLAY,x
 
-  BRA begin_print
-  
+  JMP begin_print
 
-carriage_return:
-  LDA #%10101000 ; load $40 into DDRAM to push cursor down
-  JSR lcd_instruction
-  INX
-  BRA print
+init_timer:
+  STZ ticks
+  STZ ticks + 1
+  STZ ticks + 2
+  STZ ticks + 3
+  LDA #%01000000  ; enable timer 1 continuous interrupt mode
+  STA VIA_ACR
+  ; creates a 10 ms delay, as $4800 clock cycles takes 10 ms to go through, minus two because of two added cycles from VIA
+  LDA #$FE
+  STA VIA_T1CL
+  LDA #$47
+  STA VIA_T1CH
+
+  LDA #%11000000 ; enable interrupts from timer 1
+  STA VIA_IER
+
+  CLI
+  RTS
+
 
 print_char:
   PHA                  ; push a onto stack to preserve the char
