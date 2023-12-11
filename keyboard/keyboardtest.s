@@ -29,6 +29,8 @@ kb_wptr=$01     ; both 1 byte
 
 kb_flags=$02    ; 1 byte
 RELEASE=%00000001
+LSHIFT =%00000010
+RSHIFT =%00000100
 
 
   .org $8000
@@ -44,16 +46,41 @@ irq:
   EOR #RELEASE
   STA kb_flags
   LDA PORTA
+  CMP #$12 ; lshift
+  BEQ lshift_up
+  CMP #$59 ; rshift
+  BEQ rshift_up
   BRA exit_irq
+lshift_up:
+  LDA kb_flags
+  EOR #LSHIFT  ; flip shift bit
+  STA kb_flags
+  BRA exit_irq
+rshift_up:
+  LDA kb_flags
+  EOR #RSHIFT
+  STA kb_flags
+  BRA exit_irq
+
 read_key:
   LDA PORTA
   CMP #$F0
   BEQ release_key
+  CMP #$12 ; lshift
+  BEQ lshift_down
+  CMP #$59 ; rshift
+  BEQ rshift_down
 
   TAX
+  LDA kb_flags
+  AND #(LSHIFT | RSHIFT)
+  BNE shifted_key
+
   LDA keymap,x
-  ; BRA push_key
-  
+  BRA push_key
+
+shifted_key:
+  LDA keymap_shifted,x  
 push_key:
   LDX kb_wptr
   STA kb_buffer,x
@@ -63,6 +90,17 @@ release_key:
   LDA kb_flags
   ORA #RELEASE
   STA kb_flags
+  BRA exit_irq
+lshift_down:
+  LDA kb_flags
+  ORA #LSHIFT
+  STA kb_flags
+  BRA exit_irq
+rshift_down:
+  LDA kb_flags
+  ORA #RSHIFT
+  STA kb_flags
+  ; BRA exit_irq
 
 exit_irq:      
   LDA #10          ; wait for 11 pulses on PB6 then generate interrupt. this clears the interrupt and also sets it for the next one.
@@ -134,6 +172,8 @@ key_pressed:
   BEQ line_feed
   CMP #$1b
   BEQ clear_screen
+  CMP #$08
+  BEQ backspace
 
   JSR print_char
   INC kb_rptr
@@ -148,7 +188,11 @@ clear_screen:
   JSR lcd_instruction
   INC kb_rptr
   BRA loop
-
+backspace:
+  LDA #%00010000 ; move cursor backwards
+  JSR lcd_instruction
+  INC kb_rptr
+  BRA loop
 print_char:
   PHA                  ; push a onto stack to preserve the char
   PHA
@@ -223,7 +267,7 @@ keymap:
   .byte "?nbhgy6???mju78?" ; 30-3F
   .byte "?,kio09??./l;p-?" ; 40-4F
   .byte "??'?[=????", $0a, "]?\??" ; 50-5F
-  .byte "?????????1?47???" ; 60-6F
+  .byte "??????", $08, "??1?47???" ; 60-6F
   .byte "0.2568", $1b, "??+3-*9??" ; 70-7F
   .byte "????????????????" ; 80-8F
   .byte "????????????????" ; 90-9F
