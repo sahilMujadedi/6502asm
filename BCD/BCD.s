@@ -1,6 +1,7 @@
 UPPERMASK=$F0
 LOWERMASK=$0F
 
+; via stuff
 PORTD=$5000
 PORTC=$5001
 PORTB=$6000
@@ -16,11 +17,13 @@ RW=%00000100
 E= %00001000
 
 
+; BCD stuff
+value=$00 ; 2 byte unsigned 16-bit integer memory space
+mod10=$02 ; 1 byte to perform operations on to create BCD
+bcd_out=$03 ; 6 bytes (5 possible digits in 16 bit int, plus null terminator
 
-  ; .org $8000
   .org $8000
-  JMP reset
-irq:
+
 reset:  
   LDA #%11111111 ; set all pins on port A to output
   STA DDRC
@@ -44,30 +47,75 @@ reset:
   LDA #%00000001 ; clear display
   JSR lcd_instruction
 
-  LDX #0
+  LDA number      ; store number into ram (zero-page)
+  STA value
+  LDA number + 1
+  STA value + 1
+
+  STZ bcd_out
+divide:
+  STZ mod10      ; init remainder to 0
+  
   CLC
+  LDX #16
+divloop:
+  ROL value       ; shift all bits left
+  ROL value + 1
+  ROL mod10
+
+  SEC             ; dividend - divisor
+  LDA mod10
+  SBC #10
+  BCC ignore_bcd_result  ; if dividend - divisor is negative
+  STA mod10
+
+ignore_bcd_result:
+  DEX
+  BNE divloop
+
+  ROL value        ; shift in last bit of quotient into value
+  ROL value + 1
+
+  LDA mod10        ; load accumulator w/ mod10, convert value to ascii, print it out
+  CLC
+  ADC #"0"
+  JSR push_bcd_char
+
+  LDA value        ; check if all digits have been completed, if not (value != 0), clear mod10 and keep going
+  ORA value + 1
+  BNE divide
+  
+  LDX #0
 print:
-  LDA message,x   ; use x as index to continually print out chars in "message"
+  LDA bcd_out,x
   BEQ loop
-  CMP #$0D
-  BEQ carriage_return
   JSR print_char
   INX
   BRA print
-
 loop:
   JMP loop
-  
-message: 
-  .byte "Beep boop." ; creates a null-terminated string in memory
-  .byte $0D
-  .asciiz "I'm a robot"
-carriage_return:
-  LDA #%10101000 ; load $40 into DDRAM to push cursor down
-  JSR lcd_instruction
-  INX
-  BRA print
 
+number: .word 1206
+
+push_bcd_char:
+  PHA
+  LDY #0
+bcd_char_loop:
+  LDA bcd_out,y
+  TAX
+  PLA
+  STA bcd_out,y
+  INY
+  TXA
+  PHA
+  BNE bcd_char_loop
+
+  PLA
+  STA bcd_out,y
+
+  RTS
+
+  
 print_char:
   PHA                  ; push a onto stack to preserve the char
   PHA

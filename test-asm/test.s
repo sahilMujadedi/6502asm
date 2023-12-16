@@ -1,9 +1,8 @@
-  .org $8000
+  .org $200
   lda #$ff
-  sta $6002
+  sta $5003
   
-  ldx #$00
+  ldx #$FF
 loop:
-  stx $6000
-  inx
+  stx $5001
   jmp loop
