@@ -111,12 +111,11 @@ exit_irq:
   LDA #10          ; wait for 11 pulses on PB6 then generate interrupt. this clears the interrupt and also sets it for the next one.
   STA VIA_T2CL
   STZ VIA_T2CH
-
+end_irq:
   PLA
   PLX
   RTI
-end_irq:
-  RTI
+
 reset:
   LDX #$FF
   TXS
