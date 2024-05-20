@@ -1,3 +1,6 @@
+LOADPORT=$5000
+LOADDIRECTION=$5002
+
 UPPERMASK=$F0
 LOWERMASK=$0F
 
@@ -17,6 +20,9 @@ VIA_T1CH=$6005
 VIA_T2CL=$6008
 VIA_T2CH=$6009
 VIA_IER=$600E
+VIA_IFR=$600D
+VIA_SR=$600A
+VIA_PCR=$600C
 
 ; first 4 bits represent data, MSB to LSB
 RS=%00000010
@@ -32,10 +38,7 @@ RELEASE=%00000001
 LSHIFT =%00000010
 RSHIFT =%00000100
 
-calc_ptr=$03
-calcval1=$04
-calcval2=$05
-calcvalbuf=$06 ; holds value to be transferred into calcval1 or 2
+inst_pointer=$03
 
 
   .org $8000
@@ -43,6 +46,20 @@ calcvalbuf=$06 ; holds value to be transferred into calcval1 or 2
 irq:
   PHA
   PHX
+  PHY
+  LDA VIA_IFR
+  AND #%00000100
+  BEQ keyboard_things
+
+  INC inst_pointer
+  LDA VIA_SR
+  LDX inst_pointer
+  STA $02FF,x
+  
+
+
+  JMP end_irq
+keyboard_things:
   LDA kb_flags
   AND #RELEASE
   BEQ read_key
@@ -111,11 +128,10 @@ exit_irq:
   LDA #10          ; wait for 11 pulses on PB6 then generate interrupt. this clears the interrupt and also sets it for the next one.
   STA VIA_T2CL
   STZ VIA_T2CH
-
+end_irq:
   PLA
   PLX
-  RTI
-end_irq:
+  PLY
   RTI
 reset:
   LDX #$FF
@@ -146,12 +162,16 @@ reset:
   LDA #%00000001 ; clear display
   JSR lcd_instruction
 
-  LDA #%00100000
+  LDA #%00010000
+  STA VIA_PCR
+
+  LDA #%00101100
   STA VIA_ACR
 
-  LDA #%10100000
+  LDA #%10100100
   STA VIA_IER
 
+  
   LDA #10
   STA VIA_T2CL
   STZ VIA_T2CH
@@ -160,120 +180,37 @@ reset:
   STZ kb_rptr
   STZ kb_flags
 
-  STZ calc_ptr
+  STZ inst_pointer
 
+  LDA #"L"
+  JSR print_char
+
+  
   CLI
+  LDA VIA_SR
   JMP loop
 
 loop:
-  SEI
+  ; SEI
   LDA kb_rptr
   CMP kb_wptr
-  CLI
+  ; CLI
   BNE key_pressed
   JMP loop
 key_pressed:
   LDX kb_rptr
   LDA kb_buffer,x
   CMP #$0a
-  BEQ sum
-  CMP #$1b
-  BEQ clear_screen
-  CMP #$08
-  BEQ backspace
+  BEQ runloaded
 
+  INC kb_rptr
+  BRA loop
+runloaded:
+  LDA #"R"
   JSR print_char
-  INC kb_rptr
-  INC calc_ptr
-  BRA loop
-line_feed:
-  LDA #%10101000 ; load $40 into DDRAM to push cursor down
-  JSR lcd_instruction
-  INC kb_rptr
-  BRA loop
-clear_screen:
-  LDA #%00000001 ; clear display
-  JSR lcd_instruction
-  INC kb_rptr
-  STZ calc_ptr
-  BRA loop
-backspace:
-  LDA #%00010000 ; move cursor backwards
-  JSR lcd_instruction
-  INC kb_rptr
-  DEC calc_ptr
-  BRA loop
-sum:
-  LDX #0
-sumloop:
-  LDA kb_buffer,x
-  STA calcvalbuf
-  INX
-  LDA kb_buffer,x
-  STA calcvalbuf + 1
-  JSR ascii_to_bin1
-  LDA calcvalbuf
-  STA calcval1
-  INX
-  INX
-  LDA kb_buffer,x
-  STA calcvalbuf
-  INX
-  LDA kb_buffer,x
-  STA calcvalbuf + 1
-  JSR ascii_to_bin1
-  LDA calcvalbuf
-  STA calcval2
-
-exit_sumloop:
-  CLC
-  LDA calcval1
-  ADC calcval2
+  JMP $0300
+printhex:
   PHA
-  LDA #%10101000 ; load $40 into DDRAM to push cursor down
-  JSR lcd_instruction
-  PLA
-  JSR bin_to_ascii
-  
-  BRA loop
-
-
-ascii_to_bin1:
-  LDA calcvalbuf
-  BIT #%11000000 ; check if hex or digit
-  BEQ dig1
-  AND #LOWERMASK
-  TAX
-  LDA ascii_to_bin_map,x
-  ASL
-  ASL
-  ASL
-  ASL
-  STA calcvalbuf
-dig1:
-  AND #LOWERMASK
-  ASL
-  ASL
-  ASL
-  ASL
-  STA calcvalbuf
-ascii_to_bin2:
-  LDA calcvalbuf + 1
-  BIT #%11000000 ; check if hex or digit
-  BEQ dig2
-  AND #LOWERMASK
-  TAX
-  LDA ascii_to_bin_map,x
-  ORA calcvalbuf
-  STA calcvalbuf
-dig2:
-  AND #LOWERMASK
-  ORA calcvalbuf
-  STA calcvalbuf
-  RTS
-bin_to_ascii:
-  PHA
-  AND #UPPERMASK
   LSR
   LSR
   LSR
@@ -287,8 +224,6 @@ bin_to_ascii:
   LDA hexmap,x
   JSR print_char
   RTS
-
-  
 print_char:
   PHA                  ; push a onto stack to preserve the char
   PHA
@@ -355,10 +290,7 @@ check_busy:      ; screws with accumulator, make sure to push it onto stack befo
   STA DDRC
 
   RTS
-ascii_to_bin_map:
-  .byte $00, $0a, $0b, $0c, $0d, $0e, $0f
-hexmap:
-  .byte "0123456789ABCDEF"
+
 keymap:
   .byte "????????????? `?" ; 00-0F
   .byte "?????q1???zsaw2?" ; 10-1F
@@ -393,3 +325,5 @@ keymap_shifted:
   .byte "????????????????" ; D0-DF
   .byte "????????????????" ; E0-EF
   .byte "????????????????" ; F0-FF
+hexmap:
+  .byte "0123456789abcdef"

@@ -10,63 +10,28 @@ DDRD=$5002
 DDRC=$5003
 DDRB=$6002
 DDRA=$6003
+
 ; first 4 bits represent data, MSB to LSB
 RS=%00000010
 RW=%00000100
 E= %00001000
 
+VIA_ACR=$600B ; VIA 2 assumed
+VIA_T1CL=$6004
+VIA_T1CH=$6005
+VIA_T2CL=$6008
+VIA_T2CH=$6009
+VIA_IER=$600E
+VIA_IFR=$600D
+VIA_SR=$600A
 
-
-  ; .org $8000
-  .org $8000
-  JMP reset
-irq:
-reset:  
-  LDA #%11111111 ; set all pins on port A to output
-  STA DDRC
-  
-  LDA #%00100000 ; set 4 bit mode
-  JSR lcd_send
-  JSR check_busy
-  JSR lcd_send
-  
-  LDA #%10000000 ; set 2 line mode, 5x8 font
-  JSR lcd_send
-  JSR check_busy
-  ;; end of 4 bit set up. control from here is the exact same as 8 bit mode.
-  
-  LDA #%00001111 ; display on/off control
-  JSR lcd_instruction
-  
-  LDA #%00000110 ; entry mode set
-  JSR lcd_instruction
-  
+  .org $0300
+reset:
   LDA #%00000001 ; clear display
   JSR lcd_instruction
-
-  LDX #0
-  CLC
-print:
-  LDA message,x   ; use x as index to continually print out chars in "message"
-  BEQ loop
-  CMP #$0D
-  BEQ carriage_return
-  JSR print_char
-  INX
-  BRA print
-
 loop:
-  JMP loop
-  
-message: 
-  .byte "Beep boop." ; creates a null-terminated string in memory
-  .byte $0D
-  .asciiz "I'm a robot"
-carriage_return:
-  LDA #%10101000 ; load $40 into DDRAM to push cursor down
-  JSR lcd_instruction
-  INX
-  BRA print
+  BRA loop
+
 
 print_char:
   PHA                  ; push a onto stack to preserve the char

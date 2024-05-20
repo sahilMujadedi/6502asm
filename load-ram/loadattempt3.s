@@ -27,16 +27,16 @@ kb_buffer=$0200 ; 256 bytes for keyboard input
 kb_rptr=$00     ; write pointer increments even when computer is not ready to display, read pointer updates display and increments when it is ready
 kb_wptr=$01     ; both 1 byte
 
+
 kb_flags=$02    ; 1 byte
 RELEASE=%00000001
 LSHIFT =%00000010
 RSHIFT =%00000100
 
-calc_ptr=$03
-calcval1=$04
-calcval2=$05
-calcvalbuf=$06 ; holds value to be transferred into calcval1 or 2
-
+command_buffer=$0300
+command_rptr=$03
+command_val1=$04
+command_val2=$05
 
   .org $8000
   JMP reset
@@ -111,12 +111,11 @@ exit_irq:
   LDA #10          ; wait for 11 pulses on PB6 then generate interrupt. this clears the interrupt and also sets it for the next one.
   STA VIA_T2CL
   STZ VIA_T2CH
-
+end_irq:
   PLA
   PLX
   RTI
-end_irq:
-  RTI
+
 reset:
   LDX #$FF
   TXS
@@ -160,10 +159,13 @@ reset:
   STZ kb_rptr
   STZ kb_flags
 
-  STZ calc_ptr
+  STZ command_rptr
+
+  LDA #">"
+  JSR print_char
 
   CLI
-  JMP loop
+  ; JMP loop
 
 loop:
   SEI
@@ -176,104 +178,118 @@ key_pressed:
   LDX kb_rptr
   LDA kb_buffer,x
   CMP #$0a
-  BEQ sum
+  BEQ command
   CMP #$1b
   BEQ clear_screen
   CMP #$08
   BEQ backspace
 
+  LDX command_rptr
+  STA command_buffer,x
+  INC command_rptr
+
   JSR print_char
   INC kb_rptr
-  INC calc_ptr
   BRA loop
-line_feed:
-  LDA #%10101000 ; load $40 into DDRAM to push cursor down
-  JSR lcd_instruction
-  INC kb_rptr
-  BRA loop
+
 clear_screen:
   LDA #%00000001 ; clear display
   JSR lcd_instruction
+  LDA #">"
+  JSR print_char
+  STZ command_rptr
   INC kb_rptr
-  STZ calc_ptr
   BRA loop
 backspace:
+  LDA #0
+  CMP command_rptr
+  BEQ end_backspace
   LDA #%00010000 ; move cursor backwards
   JSR lcd_instruction
+  DEC command_rptr
+end_backspace:
   INC kb_rptr
-  DEC calc_ptr
   BRA loop
-sum:
-  LDX #0
-sumloop:
-  LDA kb_buffer,x
-  STA calcvalbuf
-  INX
-  LDA kb_buffer,x
-  STA calcvalbuf + 1
-  JSR ascii_to_bin1
-  LDA calcvalbuf
-  STA calcval1
-  INX
-  INX
-  LDA kb_buffer,x
-  STA calcvalbuf
-  INX
-  LDA kb_buffer,x
-  STA calcvalbuf + 1
-  JSR ascii_to_bin1
-  LDA calcvalbuf
-  STA calcval2
 
-exit_sumloop:
+command:
+  LDX #0
+  LDA command_buffer,x
+  CMP #"w"
+  BEQ write
+  CMP #"r"
+  BEQ read
+  CMP #"a"
+  BEQ add
+  CMP #"l"
+  BEQ load
+  JMP end_write
+load:
+  INX                     ; check if it spells "load", otherwise branch to invalid
+  LDA command_buffer,x
+  CMP #"o"
+  BNE invalid
+  INX
+  LDA command_buffer,x
+  CMP #"a"
+  BNE invalid
+  INX
+  LDA command_buffer,x
+  CMP #"d"
+  BNE invalid
+  
+  LDA #%11000001; load $41 into DDRAM to push cursor down and right
+  JSR lcd_instruction
+  ; TODO: enable interrupts from CB pin, remember interrupts only come from one VIA, so to clear interrupt you must read from the interrupt VIA, not the data VIA.
+  
+
+add:
+  LDA #%11000001; load $41 into DDRAM to push cursor down and right
+  JSR lcd_instruction
   CLC
-  LDA calcval1
-  ADC calcval2
+  LDA command_val1
+  ADC command_val2
+  BCC nocarry
   PHA
-  LDA #%10101000 ; load $40 into DDRAM to push cursor down
+  LDA #"1"
+  JSR print_char
+  PLA
+nocarry:
+  PHA
+
+  LSR
+  LSR
+  LSR
+  LSR
+  TAX
+  LDA hexmap,x
+  JSR print_char
+
+  PLA
+
+  AND #LOWERMASK
+  TAX
+  LDA hexmap,x
+  JSR print_char
+
+  JMP end_write
+read:
+  INX
+  LDA command_buffer,x
+  CMP #"2"
+  BEQ read2
+  CMP #"1"
+  BNE invalidread
+  
+
+  LDA command_val1
+
+read_print:
+  PHA
+  LDA #%11000001; load $41 into DDRAM to push cursor down and right
   JSR lcd_instruction
   PLA
-  JSR bin_to_ascii
-  
-  BRA loop
-
-
-ascii_to_bin1:
-  LDA calcvalbuf
-  BIT #%11000000 ; check if hex or digit
-  BEQ dig1
-  AND #LOWERMASK
-  TAX
-  LDA ascii_to_bin_map,x
-  ASL
-  ASL
-  ASL
-  ASL
-  STA calcvalbuf
-dig1:
-  AND #LOWERMASK
-  ASL
-  ASL
-  ASL
-  ASL
-  STA calcvalbuf
-ascii_to_bin2:
-  LDA calcvalbuf + 1
-  BIT #%11000000 ; check if hex or digit
-  BEQ dig2
-  AND #LOWERMASK
-  TAX
-  LDA ascii_to_bin_map,x
-  ORA calcvalbuf
-  STA calcvalbuf
-dig2:
-  AND #LOWERMASK
-  ORA calcvalbuf
-  STA calcvalbuf
-  RTS
-bin_to_ascii:
   PHA
-  AND #UPPERMASK
+
   LSR
   LSR
   LSR
@@ -281,14 +297,154 @@ bin_to_ascii:
   TAX
   LDA hexmap,x
   JSR print_char
+
   PLA
+
   AND #LOWERMASK
   TAX
   LDA hexmap,x
   JSR print_char
-  RTS
+
+  JMP end_write
+read2:
+  LDA command_val2
+  BRA read_print
+invalidread:
+  JMP invalid
+write:
+  INX
+  LDA command_buffer,x
+  CMP #"2"
+  BEQ write2
+  CMP #"1"
+  BNE invalid
 
   
+  INX
+  LDA command_buffer,x
+  CMP #" "
+  BNE invalid
+  INX
+  LDA command_buffer,x
+  JSR hexcheck
+  CMP #"E"
+  BEQ invalid
+  STZ command_val1
+
+  JSR rol1
+
+  INX
+  TXA
+  CMP command_rptr
+  BEQ jmp_end_write
+  TAX
+  LDA command_buffer,x
+  JSR hexcheck
+  CMP #"E"
+  BEQ invalid
+  
+  JSR rol1
+jmp_end_write:
+    BRA end_write
+rol1:
+  ASL
+  ASL
+  ASL
+  ASL
+  CLC
+  ROL
+  ROL command_val1
+  ROL
+  ROL command_val1
+  ROL
+  ROL command_val1
+  ROL
+  ROL command_val1
+  RTS
+hexcheck:
+  PHX
+  LDX #0
+hexcheckloop:
+  PHA
+  TXA
+  CMP #$10     ; check if x has fallen out of hexmap which is $10 characters long
+  BEQ invalidhex
+  TAX
+  PLA
+  CMP hexmap,x
+  BEQ validhex
+  INX
+  BRA hexcheckloop
+validhex:
+  TXA
+  PLX
+  RTS
+invalidhex:
+  PLA
+  PLX
+  LDA #"E"
+  RTS
+
+invalid:
+  LDA #%11000001 ; load $40 into DDRAM to push cursor down
+  JSR lcd_instruction
+  LDA #"E"
+  JSR print_char
+  BRA end_write
+
+write2:
+  INX
+  LDA command_buffer,x
+  CMP #" "
+  BNE invalid
+  INX
+  LDA command_buffer,x
+  JSR hexcheck
+  CMP #"E"
+  BEQ invalid
+
+  STZ command_val2
+  
+  JSR rol2
+
+  INX
+  TXA
+  CMP command_rptr
+  BEQ end_write
+  TAX
+  LDA command_buffer,x
+  JSR hexcheck
+  CMP #"E"
+  BEQ invalid
+
+  JSR rol2
+  
+  BRA end_write
+rol2:
+  ASL
+  ASL
+  ASL
+  ASL
+  CLC
+  ROL
+  ROL command_val2
+  ROL
+  ROL command_val2
+  ROL
+  ROL command_val2
+  ROL
+  ROL command_val2
+  RTS
+end_write:
+  LDA #%11000000 ; load $40 into DDRAM to push cursor down
+  JSR lcd_instruction
+  LDA #">"
+  JSR print_char
+  STZ command_rptr
+  INC kb_rptr
+  JMP loop
+
+
 print_char:
   PHA                  ; push a onto stack to preserve the char
   PHA
@@ -355,10 +511,9 @@ check_busy:      ; screws with accumulator, make sure to push it onto stack befo
   STA DDRC
 
   RTS
-ascii_to_bin_map:
-  .byte $00, $0a, $0b, $0c, $0d, $0e, $0f
+
 hexmap:
-  .byte "0123456789ABCDEF"
+  .byte "0123456789abcdef"
 keymap:
   .byte "????????????? `?" ; 00-0F
   .byte "?????q1???zsaw2?" ; 10-1F
