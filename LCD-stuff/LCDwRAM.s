@@ -15,11 +15,7 @@ RS=%00000010
 RW=%00000100
 E= %00001000
 
-
-
-  ; .org $8000
   .org $8000
-  JMP reset
 irq:
 reset:  
   LDA #%11111111 ; set all pins on port A to output
@@ -134,3 +130,7 @@ check_busy:      ; screws with accumulator, make sure to push it onto stack befo
   STA DDRC
 
   RTS
+
+  .org $FFFC
+  .word reset
+  .word irq

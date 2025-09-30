@@ -5,7 +5,7 @@ I'm branching out at this point to build a different type of computer, so I've n
 
 I'm using the VASM assembler ( google it ) for this, use this command to generate a binary file in the correct format:
 
-```vasm6502_oldstyle -Fbin -dotdir -c02 example.s```
+```vasm6502_oldstyle -Fbin -dotdir -wdc02 example.s```
 
 I then use this command with hexdump to return the binary in the correct format into the clipboard, depends on hexdump and xclip:
 

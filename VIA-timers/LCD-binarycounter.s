@@ -253,3 +253,7 @@ check_busy:      ; screws with accumulator, make sure to push it onto stack befo
 
 hexmap:
   .byte "0123456789ABCDEF"
+
+  .org $FFFC
+  .word reset
+  .word irq
